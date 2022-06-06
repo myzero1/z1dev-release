@@ -1,6 +1,6 @@
 #!/bin/bash
 
-composer self-update --2
+# composer self-update --2
 
 mirrorsUrl='https://mirrors.aliyun.com/composer/'
 # mirrorsUrl='https://mirrors.cloud.tencent.com/composer/'

@@ -121,7 +121,7 @@ function set_db(){
     docker-compose exec -T mysql mysql -hlocalhost -P3306 -uroot -e "set GLOBAL innodb_flush_log_at_trx_commit=0";
     docker-compose exec -T mysql mysql -hlocalhost -P3306 -uroot -e'set names utf8;create database yii2advanced;';
     docker-compose exec -T mysql mysql -hlocalhost -P3306 -uroot -e "set GLOBAL innodb_flush_log_at_trx_commit=1";
-    docker-compose exec -T builder php /app/app/yii2-advanced/yii migrate/up
+    docker-compose exec -T builder php /app/app/yii2-advanced/yii migrate/up --interactive=0
     # root:z1admin
     docker-compose exec -T mysql mysql -hlocalhost -P3306 -uroot -e "use yii2advanced;INSERT INTO yii2advanced.user (id, username, auth_key, password_hash, password_reset_token, email, status, created_at, updated_at, verification_token) VALUES ('1', 'admin', '1', '\$2y\$13\$9hxhuFkevbgldCd52rwWJ.EwGN7YgQ.Zyp24W/weKhrwCiYFtW3DC', '1', 'myzero1@qq.com', '10', '1654066014', '1654066014', '1');";
 

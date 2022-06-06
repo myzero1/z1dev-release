@@ -1,0 +1,36 @@
+server {
+    listen 80;
+    server_name _;
+
+    index index.html index.php;
+
+    root /usr/share/nginx/app/yii2-advanced/backend/web;
+
+    location / {
+        try_files $uri $uri/ /index.php/$uri$is_args$args;
+        # try_files  $uri /index.php$is_args$args;
+    }
+
+    location ~ \.php {
+        fastcgi_pass php_fpm:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        set $real_script_name $fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME $document_root$real_script_name;
+        fastcgi_param SCRIPT_NAME $real_script_name;
+    }
+    
+    # 完美的nginx图片防盗链设置详解
+    # https://www.cnblogs.com/bass6/p/5748694.html
+    location ~* \.(gif|jpg|png|swf|flv|bmp)$ {
+        # White list
+        valid_referers autonym.test 127.0.0.1 HOST_IP ENV_IP;
+        # valid_referers none blocked *.espressos.cn;
+        # none代表没有referer;blocded代表有referer但是被防火墙或者是代理给去除了。
+
+        if ($invalid_referer) {
+            # rewrite ^/ http://192.168.1.25/404.jpg;
+            return 403;
+        }
+    }
+}

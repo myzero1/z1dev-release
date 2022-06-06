@@ -1,0 +1,303 @@
+# docker-composer up -d -f docker-compose-dev.yaml
+# docker-compose up --build mybin 使用这个命令来构建环境已经代码
+# docker-compose up -d --build mybin
+# docker network create smsj_net
+# docker network rm smsj_net
+# docker network ls
+# docker exec -it sj_builder /bin/bash/
+# docker network inspect reb_sm__default
+# docker network disconnect -f reb_sm__default reb_sm__redis
+
+version: "3.6"
+services:
+  nginx:
+    hostname: ${APP_NAME}_nginx
+    image: nginx:alpine
+    container_name: ${APP_NAME}_nginx # 指定容器名称，如果不设置此参数，则由系统自动生成
+    environment:
+      - TZ=Asia/Shanghai # 设置容器时区与宿主机保持一致
+    volumes:
+      - /etc/localtime:/etc/localtime:ro # 设置容器时区与宿主机保持一致
+      - ./nginx/conf/conf.d:/etc/nginx/conf.d
+      - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./workspace-pub/app:/usr/share/nginx/app
+    ports:
+      - "30${APP_ID}0:80" # yii2-advanced-backend
+    privileged: true
+    depends_on:
+      - php_fpm
+
+  # 若mysql不能正常启动，可以尝试销毁mysql容器再重建（需要先docker-compose down在删除共享目录mysql），或者重启实体机再重试。
+  mysql:
+    hostname: ${APP_NAME}_mysql
+    image: mysql:5.7.26
+    container_name: ${APP_NAME}_mysql
+    # restart: always # 设置容器自启模式
+    # command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci # linux
+    command: # 兼容window共享目录初始化
+      - bash
+      - -c
+      - |
+
+        # mysqld --initialize
+        echo '-----------initialize--------------'`date`
+        # mysqld --user=root --initialize-insecure
+        mysqld --initialize-insecure
+        mysqld stop
+
+        echo '-----------mysqld start--------------'`date`
+        \cp -rf /tmp/my.cnf /etc/mysql/mysql.conf.d/mysqld.cnf && chmod 755 /etc/mysql/mysql.conf.d/mysqld.cnf
+        echo > /var/log/mysql/error.log
+        nohup mysqld --user=root --character-set-server=utf8 --collation-server=utf8_unicode_ci& # 设置utf8字符集
+
+        echo 0 > /tmp/mysql_flag
+        for i in {0..20}; do
+          sleep 3s
+
+          if [ `cat /var/log/mysql/error.log | grep 3306 | wc -l` == 2 ];then
+            echo "---mysqld is ok"
+            echo '--------- setting 'root'@'%' ----------'`pidof mysqld`
+            mysql -hlocalhost -P3306 -uroot -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION";
+            mysql -hlocalhost -P3306 -uroot -e "FLUSH PRIVILEGES";
+            break
+          fi
+
+          echo ---------------flag--------------------`cat /tmp/mysql_flag`
+          if [ `cat /tmp/mysql_flag` == "20" ]; then
+            echo '------check timeout(60s) and exit------------'
+            exit 1
+          fi
+
+          expr `cat /tmp/mysql_flag` + 1 > /tmp/mysql_flag
+
+          echo '--------- check setting 'root'@'%' ----------'`date`
+          cat /var/log/mysql/error.log
+          
+        done
+
+        echo '--------- mysql is running ----------'
+
+        while true; do sleep 3; done
+
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_ROOT_PASSWORD=root
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./workspace-pub/data/mysql:/var/lib/mysql
+      - ./mysql/cnf/my.cnf:/tmp/my.cnf
+    ports:
+      - "31${APP_ID}0:3306"
+    privileged: true
+
+  redis:
+    hostname: ${APP_NAME}_redis
+    image: redis:alpine3.14
+    container_name: ${APP_NAME}_redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    # redis-cli 192.168.56.135 34110
+    # AUTH root
+    # set k1 v1  # aof
+    # FLUSHALL   # RDB
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./redis/cnf/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./workspace-pub/data/redis:/data
+    ports:
+      - "32${APP_ID}0:6379"
+    privileged: true
+
+  mongo:
+    hostname: ${APP_NAME}_mongo
+    image: mongo:5.0.8-focal
+    container_name: ${APP_NAME}_mongo
+    # mongo mongodb://root:root@192.168.56.135:35110
+    # use db1
+    # db.createCollection("t1")
+    # db.t1.insert({"name" : "菜鸟教程"})
+    # db.t1.find()
+    # command: --config /data/configdb/mongod.conf
+    command: # 兼容window共享目录初始化
+      - bash
+      - -c
+      - |
+
+        # mongod
+        # mongod --port 27017 --bind_ip_all --auth
+
+        rm -rf /tmp/mongodb-27017.sock
+
+        nohup mongod --port 27017 --bind_ip_all --auth&
+
+        echo 0 > /tmp/mongo_flag
+        for i in {0..20}; do
+          sleep 3s
+          
+          if [ `ls /tmp/mongodb-27017.sock | wc -l` == 1 ];then
+            echo '--------- setting 'root'@'%' ----------'`date`
+            mongo admin --eval "printjson(db.getSiblingDB(db.createUser({user:'root',pwd:'root',roles:[{role:'root',db:'admin'}]})))"
+            echo "---mongo is ok"
+            break
+          fi
+
+          echo ---------------flag--------------------`cat /tmp/mongo_flag`
+          if [ `cat /tmp/mongo_flag` == "20" ]; then
+            echo '------check timeout(60s) and exit------------'
+            exit 1
+          fi
+
+          expr `cat /tmp/mongo_flag` + 1 > /tmp/mongo_flag
+
+          echo '--------- check setting 'root'@'%' ----------'`date`
+        done
+
+        echo '--------- mongo is running ----------'
+
+        while true; do sleep 3; done
+
+    environment:
+      - TZ=Asia/Shanghai
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=root
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./workspace-pub/data/mongodb/db:/data/db
+      - ./mongodb/cnf/mongod.conf:/data/configdb/mongod.conf
+      - ./workspace-pub/data/mongodb/log:/data/log
+    ports:
+      - "33${APP_ID}0:27017"
+    privileged: true
+
+  php_fpm:
+    hostname: ${APP_NAME}_php_fpm
+    image: my_php_fpm:1.0
+    build: ./php-fpm
+    container_name: ${APP_NAME}_php_fpm
+    command:
+      - bash
+      - -c
+      - |
+
+        #启动php-fpm
+        php-fpm
+
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./workspace-pub/app:/usr/share/nginx/app
+      - ./php-fpm/conf/mycrontab:/etc/cron.d/mycrontab
+      # - ./php-fpm/conf/monitor.sh:/root/docker-cnf/php-fpm/monitor.sh
+      # - ./php-fpm/conf/php-fpm.conf:/usr/local/etc/php-fpm.conf
+      # - ./php-fpm/conf/php.ini:/usr/local/etc/php/php.ini
+    ports:
+      - "34${APP_ID}0:9000"
+    privileged: true
+    depends_on:
+      - mysql
+
+  # https://www.kancloud.cn/wj596/go-mysql-transfer/2064426
+  # https://github.com/wj596/go-mysql-transfer
+  mysql_transfer:
+    hostname: ${APP_NAME}_mysql_transfer
+    image: mybin:1.0
+    build: ./mybin
+    container_name: ${APP_NAME}_mysql_transfer
+    command:
+      - bash
+      - -c
+      - |
+
+        cd /mysql_transfer
+
+        if [ ! -d "/mysql_transfer/transfer" ]; then
+        # if [ -z `ls -A /mysql_transfer` ];then
+          # echo "/tmp/mongodb 为空目录.................."
+          # wget https://hub.fastgit.xyz/wj596/go-mysql-transfer/releases/download/v1.0.4/transfer-v1.0.4.release-liunx-x86_64.zip
+          rm -rf transfer-v1.0.4.release-liunx-x86_64.zip
+          wget https://github.91chi.fun//https://github.com/wj596/go-mysql-transfer/releases/download/v1.0.4/transfer-v1.0.4.release-liunx-x86_64.zip
+          unzip transfer-v1.0.4.release-liunx-x86_64.zip
+        fi
+
+        echo 0 > /tmp/mysql_transfer_flag
+        for i in {0..20}; do
+          sleep 3s
+
+          wget mongo:27017 > /tmp/mongo 2>&1
+          wget mysql:3306 > /tmp/mysql 2>&1
+
+          if [ `cat /tmp/mongo | grep "bad address" | wc -l` == 0 -a `cat /tmp/mysql | grep "bad address" | wc -l` == 0 ]; then
+            echo '------mongo and mysql are running------------'
+            \cp -rfa /tmp/mysql-transfer-app.yml transfer/app.yml
+            cd /mysql_transfer/transfer && ./go-mysql-transfer
+            echo '------go-mysql-transfer is running------------'
+            break
+          fi
+
+          echo ---------------flag--------------------`cat /tmp/mysql_transfer_flag`
+          if [ `cat /tmp/mysql_transfer_flag` == "20" ]; then
+            echo '------check timeout(60s) and exit------------'
+            exit 1
+          fi
+
+          expr `cat /tmp/mysql_transfer_flag` + 1 > /tmp/mysql_transfer_flag
+          
+          echo '--------- check mongo and mysql are running ----------'`date`
+        done
+
+        # service holdon
+        while true; do sleep 3; done
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./workspace-pub/app/mysql_transfer:/mysql_transfer
+      - ./mysql-transfer/cnf/mysql-transfer-app.yml:/tmp/mysql-transfer-app.yml
+    ports:
+      - "39${APP_ID}0:8060"
+      - "39${APP_ID}1:9595"
+    privileged: true
+    env_file:
+      - .env
+    depends_on:
+      - mysql
+      - mongo
+
+  builder:
+    hostname: ${APP_NAME}_builder
+    image: builder:2.0
+    build: ./builder
+    container_name: ${APP_NAME}_builder
+    command:
+      - bash
+      - -c
+      - |
+
+        export COMPOSER_HOME=/mytmp
+        git config --global http.sslVerify false
+
+        # git clone --depth 10 url
+        # git remote set-branches --add origin '*'
+        # git fetch 
+        # git branch -a
+        
+        # git clone --depth 10 autonym
+        # add yii2-advanced
+        if [ ! -d "/app/app/yii2-advanced" ];then
+          cd /app/app
+          timeout 30 composer create-project --no-install yiisoft/yii2-app-advanced yii2-advanced 2.0.42 -vvv #这命令最多执行30s
+          cd yii2-advanced
+          \cp -rfa /app/install-yii2-ali.sh install-yii2-ali.sh
+          bash install-yii2-ali.sh
+          rm -rf install-yii2-ali.sh
+
+          echo "------- add yii2-advanced is ok ------"
+        fi
+
+        # service holdon
+        while true; do sleep 3; done
+    environment:
+      - GOPATH=/app/golang
+    volumes:
+      - /etc/localtime:/etc/localtime:ro # 设置容器时区与宿主机保持一致
+      - ./workspace-pub:/app
+      - /tmp:/mytmp
+    privileged: true

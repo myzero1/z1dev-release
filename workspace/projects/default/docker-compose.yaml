@@ -95,7 +95,7 @@ services:
     image: redis:alpine3.14
     container_name: ${APP_NAME}_redis
     command: redis-server /usr/local/etc/redis/redis.conf
-    # redis-cli 192.168.56.135 34110
+    # redis-cli -h 192.168.56.135 -p 32110
     # AUTH root
     # set k1 v1  # aof
     # FLUSHALL   # RDB
@@ -164,7 +164,6 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./workspace-pub/data/mongodb/db:/data/db
-      - ./mongodb/cnf/mongod.conf:/data/configdb/mongod.conf
       - ./workspace-pub/data/mongodb/log:/data/log
     ports:
       - "33${APP_ID}0:27017"

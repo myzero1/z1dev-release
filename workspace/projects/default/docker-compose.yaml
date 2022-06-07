@@ -47,37 +47,32 @@ services:
 
         echo '-----------mysqld start--------------'`date`
         \cp -rf /tmp/my.cnf /etc/mysql/mysql.conf.d/mysqld.cnf && chmod 755 /etc/mysql/mysql.conf.d/mysqld.cnf
-        echo > /var/log/mysql/error.log
         nohup mysqld --user=root --character-set-server=utf8 --collation-server=utf8_unicode_ci& # 设置utf8字符集
 
-        # /var/lib/mysql
-        
-        if [ ! -d "/var/lib/mysql/mysql" ]; then
-          echo 0 > /tmp/mysql_flag
-          for i in {0..20}; do
-            sleep 3s
+        echo 0 > /tmp/mysql_flag
+        for i in {0..20}; do
+          sleep 3s
 
-            if [ `cat /var/log/mysql/error.log | grep 3306 | wc -l` == 2 ];then
-              echo "---mysqld is ok"
-              echo '--------- setting 'root'@'%' ----------'`pidof mysqld`
-              mysql -hlocalhost -P3306 -uroot -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION";
-              mysql -hlocalhost -P3306 -uroot -e "FLUSH PRIVILEGES";
-              break
-            fi
+          if [ `mysql -e "show databases" | grep information_schema | wc -l` == 1 ];then
+            echo "---------- 3306 listening -----------------"
+            echo '--------- setting 'root'@'%' ----------'`pidof mysqld`
+            mysql -hlocalhost -P3306 -uroot -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION";
+            mysql -hlocalhost -P3306 -uroot -e "FLUSH PRIVILEGES";
+            break
+          fi
 
-            echo ---------------flag--------------------`cat /tmp/mysql_flag`
-            if [ `cat /tmp/mysql_flag` == "20" ]; then
-              echo '------check timeout(60s) and exit------------'
-              exit 1
-            fi
+          echo ---------------flag--------------------`cat /tmp/mysql_flag`
+          if [ `cat /tmp/mysql_flag` == "20" ]; then
+            echo '------check timeout(60s) and exit------------'
+            exit 1
+          fi
 
-            expr `cat /tmp/mysql_flag` + 1 > /tmp/mysql_flag
+          expr `cat /tmp/mysql_flag` + 1 > /tmp/mysql_flag
 
-            echo '--------- check setting 'root'@'%' ----------'`date`
-            cat /var/log/mysql/error.log
-            
-          done
-        fi
+          echo '--------- check setting 'root'@'%' ----------'`date`
+          cat /var/log/mysql/error.log
+
+        done
 
         echo '--------- mysql is running ----------'
 

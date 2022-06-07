@@ -50,30 +50,34 @@ services:
         echo > /var/log/mysql/error.log
         nohup mysqld --user=root --character-set-server=utf8 --collation-server=utf8_unicode_ci& # 设置utf8字符集
 
-        echo 0 > /tmp/mysql_flag
-        for i in {0..20}; do
-          sleep 3s
+        # /var/lib/mysql
+        
+        if [ ! -d "/var/lib/mysql/mysql" ]; then
+          echo 0 > /tmp/mysql_flag
+          for i in {0..20}; do
+            sleep 3s
 
-          if [ `cat /var/log/mysql/error.log | grep 3306 | wc -l` == 2 ];then
-            echo "---mysqld is ok"
-            echo '--------- setting 'root'@'%' ----------'`pidof mysqld`
-            mysql -hlocalhost -P3306 -uroot -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION";
-            mysql -hlocalhost -P3306 -uroot -e "FLUSH PRIVILEGES";
-            break
-          fi
+            if [ `cat /var/log/mysql/error.log | grep 3306 | wc -l` == 2 ];then
+              echo "---mysqld is ok"
+              echo '--------- setting 'root'@'%' ----------'`pidof mysqld`
+              mysql -hlocalhost -P3306 -uroot -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION";
+              mysql -hlocalhost -P3306 -uroot -e "FLUSH PRIVILEGES";
+              break
+            fi
 
-          echo ---------------flag--------------------`cat /tmp/mysql_flag`
-          if [ `cat /tmp/mysql_flag` == "20" ]; then
-            echo '------check timeout(60s) and exit------------'
-            exit 1
-          fi
+            echo ---------------flag--------------------`cat /tmp/mysql_flag`
+            if [ `cat /tmp/mysql_flag` == "20" ]; then
+              echo '------check timeout(60s) and exit------------'
+              exit 1
+            fi
 
-          expr `cat /tmp/mysql_flag` + 1 > /tmp/mysql_flag
+            expr `cat /tmp/mysql_flag` + 1 > /tmp/mysql_flag
 
-          echo '--------- check setting 'root'@'%' ----------'`date`
-          cat /var/log/mysql/error.log
-          
-        done
+            echo '--------- check setting 'root'@'%' ----------'`date`
+            cat /var/log/mysql/error.log
+            
+          done
+        fi
 
         echo '--------- mysql is running ----------'
 
@@ -113,7 +117,7 @@ services:
     hostname: ${APP_NAME}_mongo
     image: mongo:5.0.8-focal
     container_name: ${APP_NAME}_mongo
-    # mongo mongodb://root:root@192.168.56.135:35110
+    # mongo mongodb://root:root@192.168.56.135:33110
     # use db1
     # db.createCollection("t1")
     # db.t1.insert({"name" : "菜鸟教程"})
@@ -227,7 +231,9 @@ services:
 
           if [ `cat /tmp/mongo | grep "bad address" | wc -l` == 0 -a `cat /tmp/mysql | grep "bad address" | wc -l` == 0 ]; then
             echo '------mongo and mysql are running------------'
-            \cp -rfa /tmp/mysql-transfer-app.yml transfer/app.yml
+            rm -rf /mysql_transfer/transfer/store/mysql_transfer_cnf
+            \cp -rfa /mysql_transfer_cnf /mysql_transfer/transfer/store/
+            \cp -rfa /mysql_transfer_cnf/mysql-transfer-app.yml transfer/app.yml
             cd /mysql_transfer/transfer && ./go-mysql-transfer
             echo '------go-mysql-transfer is running------------'
             break
@@ -248,8 +254,8 @@ services:
         while true; do sleep 3; done
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - ./mysql-transfer/cnf:/mysql_transfer_cnf
       - ./workspace-pub/app/mysql_transfer:/mysql_transfer
-      - ./mysql-transfer/cnf/mysql-transfer-app.yml:/tmp/mysql-transfer-app.yml
     ports:
       - "39${APP_ID}0:8060"
       - "39${APP_ID}1:9595"

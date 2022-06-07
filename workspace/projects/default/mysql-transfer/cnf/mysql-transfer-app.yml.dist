@@ -129,3 +129,9 @@ rule:
     #rabbitmq_queue: user_topic #queue名称,可以为空，默认使用表(Table)名称
 
     #reserve_raw_data: true #保留update之前的数据，针对rocketmq、kafka、rabbitmq有用;默认为false
+  
+  -
+    schema: yii2advanced #数据库名称
+    table: user #表名称
+    lua_file_path: /mysql_transfer_cnf/lua/t_user_mongo.lua   #lua脚本文件
+    mongodb_database: yii2advanced #mongodb database不能为空

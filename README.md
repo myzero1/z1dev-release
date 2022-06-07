@@ -1,6 +1,6 @@
 # Z1dev
 
-myzero1's dev
+This is a docker-compose env on window,maybe can work on macos.It include a demo project env,in workspace/projects/default.
 
 ## install vagrant
 ```
@@ -22,40 +22,50 @@ download from aliyun pan https://www.aliyundrive.com/
 
 设置默认虚拟电脑位置：virtualbox 》 管理 》 常规 》 默认虚拟电脑位置
 
-安装  vagrant plugin install vagrant-winnfsd 以超级管理员运行
-
-
-写一个bat脚本来安装。
-
-
-
 
 ```
 
+## usage
 
-## install docker and docker-compose
 ```
+cd path/to/z1dev-release
+vagrant up
+vagrant ssh
+su root             input pw vagrant
+cd /workspace
 bash check-docker-compose.sh
+cd /workspace/projects/default
+bash reinit-envs.sh
+bash reinit.sh
 
 ```
 
-
-## user projects/default
-```
-cd projects/default
-bash reinit-envs.sh 设置相应的参数
-bash reinit.sh  需要调整,会再这里配置mysql的root用户密码为root并且可以远程访问
-docker-composer up
-docker-composer up -d
-
-
+## Common commands
 
 ```
+vagrant up
+vagrant ssh
+vagrant halt
+vagrant destroy
+vagrant snapshot save z1dev
+vagrant snapshot restore z1dev
 
-## init project
+docker-compose ps
+docker-compose down
+docker-compose up [-d]
+docker-compose stop
+docker-compose start
+docker-compose restart
+docker-compose up mysql
+docker-compose up --build mysql
 
-```
-cd projects/default
-docker-compose up -d
+docker exec -it dev__mysql /bin/bash
+docker stop dev__mysql
+docker start dev__mysql
+docker ps 
+docker ps -aq
+docker rm $(docker ps -aq)
+docker images
+docker rmi $(docker images -aq)
 
 ```
